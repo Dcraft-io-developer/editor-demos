@@ -1,24 +1,33 @@
-import React from "react";
+// src/App.tsx
 import { NodeEditor, NodeMap } from "flume";
-import { flumeConfig } from "./config";
+import React, { useState } from "react";
+import { flumeConfig as config } from "./config";
 import { buildNodeToCode } from "./engine";
 
-export default function App() {
+const App: React.FC = () => {
+  const [code, setCode] = useState("");
+
   const [nodes, setNodes] = React.useState<NodeMap>({});
 
-  console.log(buildNodeToCode(nodes));
-  React.useCallback((nodes: NodeMap) => {
+  const onNodeChange = React.useCallback((nodes: NodeMap) => {
     // Do whatever you want with the nodes
     setNodes(nodes);
+    setCode(buildNodeToCode(nodes));
   }, []);
+
   return (
-    <div style={{ width: 1080, height: 680 }}>
-      <NodeEditor
-        nodeTypes={flumeConfig.nodeTypes}
-        portTypes={flumeConfig.portTypes}
-        nodes={nodes}
-        onChange={setNodes}
-      />
+    <div className="grid h-screen grid-cols-2 gap-4">
+      <div>
+        <NodeEditor
+          portTypes={config.portTypes}
+          nodeTypes={config.nodeTypes}
+          nodes={nodes}
+          onChange={onNodeChange}
+        />
+      </div>
+      <code>{code}</code>
     </div>
   );
-}
+};
+
+export default App;

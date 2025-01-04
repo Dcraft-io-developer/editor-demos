@@ -359,7 +359,10 @@ flumeConfig
         ...ids.map((id) => ports.string({ name: id, label: id })),
       ];
     },
-    outputs: (ports) => [ports.string({ label: "Message", name: "result" })],
+    outputs: (ports) => [
+      ports.trigger({ label: "Trigger", name: "trigger" }),
+      ports.string({ label: "Message", name: "result" }),
+    ],
   })
   .addNodeType({
     type: "numberToString",
@@ -454,5 +457,18 @@ flumeConfig
     outputs: (port) => [
       port.trigger({ name: "trigger", label: "trigger to" }),
       port.channel({ name: "channel", label: "channel" }),
+    ],
+  })
+  .addNodeType({
+    type: "getGuild",
+    label: "Get Guild",
+    description: "Gets a guild by its id",
+    inputs: (port) => [
+      port.trigger({ name: "trigger", label: "trigger from" }),
+      port.string({ name: "id", label: "guild id" }),
+    ],
+    outputs: (port) => [
+      port.trigger({ name: "trigger", label: "trigger to" }),
+      port.guild({ name: "guild", label: "guild" }),
     ],
   });

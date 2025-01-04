@@ -1,8 +1,5 @@
-import { FlumeNode, NodeMap } from "flume";
+import { NodeMap, FlumeNode } from "./types";
 
-// interface Node extends FlumeNode {
-//   children: Node[]
-// }
 
 const template = `import { Client, Events, GatewayIntentBits } from "discord.js";
 
@@ -113,7 +110,7 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
           content = variableName
         }
       }
-      result += `const ${replaceSpecialChar(node.id)}_eventMessageSendData_result = await ${messageVariableName}.channel.send(\`${content}\`);\n`
+      result += `const ${replaceSpecialChar(node.id)}_eventMessageSendData_result = await ${messageVariableName}.reply(\`${content}\`);\n`
       variable[`${node.id}_eventMessageSendData`] = `${replaceSpecialChar(node.id)}_eventMessageSendData_result`
       break
     }
@@ -275,12 +272,24 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
     case "getChannel": {
       let channelId = node.inputData.channelId.text
       const nodeInfo = node.connections.inputs["channelId"] ? (node.connections.inputs["channelId"][0]) : null
-        if (nodeInfo) {
-          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
-          if (!variableName) throw new Error("Variable Not Found")
-          channelId = variableName
-        }
+      if (nodeInfo) {
+        const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+        if (!variableName) throw new Error("Variable Not Found")
+        channelId = variableName
+      }
       result += `const ${replaceSpecialChar(node.id)}_result_result = await client.channels.fetch(${channelId});\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "getGuild": {
+      let guildId = node.inputData.guildId.text
+      const nodeInfo = node.connections.inputs["guildId"] ? (node.connections.inputs["guildId"][0]) : null
+      if (nodeInfo) {
+        const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+        if (!variableName) throw new Error("Variable Not Found")
+        guildId = variableName
+      }
+      result += `const ${replaceSpecialChar(node.id)}_result_result = await client.guilds.fetch(${guildId});\n`
       variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
       break
     }

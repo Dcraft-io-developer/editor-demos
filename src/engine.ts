@@ -8,7 +8,7 @@ const template = `import { Client, Events, GatewayIntentBits } from "discord.js"
 
 const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent"] });
 
-client.on("ready", async (interaction) => {
+client.on("ready", async (client) => {
   console.log("Bot is ready");
 });
 \n`
@@ -23,8 +23,8 @@ export function buildNodeToCode(rawNodes: NodeMap) {
     }
   }
   let result = template
-  const variable = {} as Record<string, string>
   for (const n of triggerNode) {
+    const variable = {} as Record<string, string>
     for (const i in n.connections.outputs) {
       variable[`${n.id}_${i}`] = `${replaceSpecialChar(n.id)}_${i}_result`
     }
@@ -40,6 +40,7 @@ export function buildNodeToCode(rawNodes: NodeMap) {
 
 function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<string, string>) {
   let result = ";"
+  console.log({ node, variable })
   const nodeTriggerAfter = node.connections.outputs["trigger"]
   switch (node.type) {
     case "triggerOnMessageSend": break
@@ -54,7 +55,7 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
         variable[`${node.id}_messageContent`] = `${replaceSpecialChar(node.id)}_messageContent_result`
         break
       }
-    case "compareNode": {
+    case "compareStringNode": {
       let data1 = `\`${node.inputData.data1.text}\``
       let data2 = `\`${node.inputData.data2.text}\``
       for (const port in node.connections.inputs) {
@@ -106,10 +107,11 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
       let content = node.inputData.content.text
       if (node.connections.inputs["content"]) {
         const nodeInfo = node.connections.inputs["content"] ? (node.connections.inputs["content"][0]) : null
-        if (!nodeInfo) break
-        const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
-        if (!variableName) throw new Error("Variable Not Found")
-        content = variableName
+        if (nodeInfo) {
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          content = variableName
+        }
       }
       result += `const ${replaceSpecialChar(node.id)}_eventMessageSendData_result = await ${messageVariableName}.channel.send(\`${content}\`);\n`
       variable[`${node.id}_eventMessageSendData`] = `${replaceSpecialChar(node.id)}_eventMessageSendData_result`
@@ -125,6 +127,161 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
         result += `const ${replaceSpecialChar(`${node.id}_${port}_result`)} = ${messageVariableName}.${port};\n`
         variable[`${node.id}_${port}`] = `${replaceSpecialChar(`${node.id}_${port}_result`)}`
       }
+      break
+    }
+    case "splitString": {
+      const nodeInfo = node.connections.inputs["string"] ? (node.connections.inputs["string"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      const separator = node.inputData.separator.text
+      result += `const ${replaceSpecialChar(node.id)}_result_result = ${variableName}.split(\`${separator}\`);\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "forEach": {
+      const nodeInfo = node.connections.inputs["array"] ? (node.connections.inputs["array"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      const trigger = node.connections.outputs["trigger"] ? node.connections.outputs["trigger"][0] : null
+      if (!trigger) break
+      variable[`${node.id}_item`] = `${replaceSpecialChar(node.id)}_item_result`
+      result += `for (const ${replaceSpecialChar(node.id)}_item_result of ${variableName}) {\n${parseNode(rawNodesList[trigger.nodeId], rawNodesList, variable)};\n};\n`
+      break
+    }
+    case "anyAsStr": {
+      const nodeInfo = node.connections.inputs["any"] ? (node.connections.inputs["any"][0]) : null
+      console.log({ nodeInfo })
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      result += `const ${replaceSpecialChar(node.id)}_result_result = ${variableName};\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "composeString": {
+      const template: string | null = node.inputData.template.text
+      if (!template) break
+      const variables = template.replace(/\{(.*?)\}/g, (match, p1) => {
+        const nodeInfo = node.connections.inputs[p1] ? (node.connections.inputs[p1][0]) : null
+        if (!nodeInfo) return match
+        const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+        if (!variableName) throw new Error("Variable Not Found")
+        return `\${${variableName}}`
+      })
+      result += `const ${replaceSpecialChar(node.id)}_result_result = \`${variables}\`;\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "numberToString": {
+      const nodeInfo = node.connections.inputs["number"] ? (node.connections.inputs["number"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      result += `const ${replaceSpecialChar(node.id)}_result_result = ${variableName}.toString();\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "stringToNumber": {
+      const nodeInfo = node.connections.inputs["string"] ? (node.connections.inputs["string"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      result += `const ${replaceSpecialChar(node.id)}_result_result = Number(${variableName});\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "compareNumber": {
+      let data1 = `${node.inputData.data1.number}`
+      let data2 = `${node.inputData.data2.number}`
+      for (const port in node.connections.inputs) {
+        if (port == "data1") {
+          const nodeInfo = (node.connections.inputs[port][0])
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          data1 = variableName
+        }
+        if (port == "data2") {
+          const nodeInfo = (node.connections.inputs[port][0])
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          data2 = variableName
+        }
+      }
+      let operator = "=="
+      switch (node.inputData.operator.select) {
+        case "equal":
+          operator = "=="
+          break
+        case "greater":
+          operator = ">"
+          break
+        case "less":
+          operator = "<"
+          break
+        case "greaterEqual":
+          operator = ">="
+          break
+        case "lessEqual":
+          operator = "<="
+          break
+        case "notEqual":
+          operator = "!="
+          break
+        default:
+          console.log(node.inputData.operator.select)
+      }
+      result += `const ${replaceSpecialChar(node.id)}_result_result = ${data1} ${operator} ${data2};\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
+      break
+    }
+    case "sendMessageToChannel": {
+      const nodeInfo = node.connections.inputs["channel"] ? (node.connections.inputs["channel"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      let content = node.inputData.content.text
+      if (node.connections.inputs["content"]) {
+        const nodeInfo = node.connections.inputs["content"] ? (node.connections.inputs["content"][0]) : null
+        if (nodeInfo) {
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          content = variableName
+        }
+      }
+      result += `const ${replaceSpecialChar(node.id)}_eventMessageSendData_result = await ${variableName}.send(${content});\n`
+      variable[`${node.id}_eventMessageSendData_result`] = `${replaceSpecialChar(node.id)}_eventMessageSendData_result`
+      break
+    }
+    case "sendMessageToUser": {
+      const nodeInfo = node.connections.inputs["user"] ? (node.connections.inputs["user"][0]) : null
+      if (!nodeInfo) break
+      const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+      if (!variableName) throw new Error("Variable Not Found")
+      let content = node.inputData.content.text
+      if (node.connections.inputs["content"]) {
+        const nodeInfo = node.connections.inputs["content"] ? (node.connections.inputs["content"][0]) : null
+        if (nodeInfo) {
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          content = variableName
+        }
+      }
+      result += `const ${replaceSpecialChar(node.id)}_eventMessageSendData_result = await ${variableName}.send(${content});\n`
+      variable[`${node.id}_eventMessageSendData_result`] = `${replaceSpecialChar(node.id)}_eventMessageSendData_result`
+      break
+    }
+    case "getChannel": {
+      let channelId = node.inputData.channelId.text
+      const nodeInfo = node.connections.inputs["channelId"] ? (node.connections.inputs["channelId"][0]) : null
+        if (nodeInfo) {
+          const variableName = variable[nodeInfo.nodeId + "_" + nodeInfo.portName]
+          if (!variableName) throw new Error("Variable Not Found")
+          channelId = variableName
+        }
+      result += `const ${replaceSpecialChar(node.id)}_result_result = await client.channels.fetch(${channelId});\n`
+      variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
       break
     }
     default:

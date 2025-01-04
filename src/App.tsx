@@ -6,13 +6,19 @@ import { buildNodeToCode } from "./engine";
 
 const App: React.FC = () => {
   const [code, setCode] = useState("");
+  const [error, setError] = useState("");
 
   const [nodes, setNodes] = React.useState<NodeMap>({});
 
   const onNodeChange = React.useCallback((nodes: NodeMap) => {
     // Do whatever you want with the nodes
     setNodes(nodes);
-    setCode(buildNodeToCode(nodes));
+    try {
+      setCode(buildNodeToCode(nodes));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (e: any) {
+      setError(e.message);
+    }
   }, []);
 
   return (
@@ -25,7 +31,11 @@ const App: React.FC = () => {
           onChange={onNodeChange}
         />
       </div>
-      <code>{code}</code>
+      <div>
+        <h1>Output</h1>
+        <p>{error}</p>
+        <code>{code}</code>
+      </div>
     </div>
   );
 };

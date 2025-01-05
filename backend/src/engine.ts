@@ -1,14 +1,7 @@
 import { NodeMap, FlumeNode } from "./types";
 
 
-const template = `import { Client, Events, GatewayIntentBits } from "discord.js";
 
-const client = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent"] });
-
-client.on("ready", async (client) => {
-  console.log("Bot is ready");
-});
-\n`
 
 export function buildNodeToCode(rawNodes: NodeMap) {
   // console.log({ nodes: rawNodes })
@@ -19,9 +12,21 @@ export function buildNodeToCode(rawNodes: NodeMap) {
       triggerNode.push(node)
     }
   }
+  const clientVariableName = `client_${Math.random().toString(36).substring(2, 15)}_${Math.random().toString(36).substring(2, 15)}`
+  const template = `import { Client, Events, GatewayIntentBits } from "discord.js";
+
+  const ${clientVariableName} = new Client({ intents: ["Guilds", "GuildMessages", "MessageContent"] });
+
+  ${clientVariableName}.on("ready", async (client) => {
+    console.log("Bot is ready");
+  });
+  \n`
+  const globalVariable = {
+    client: clientVariableName,
+  } as Record<string, string>
   let result = template
   for (const n of triggerNode) {
-    const variable = {} as Record<string, string>
+    const variable = { ...globalVariable } as Record<string, string>
     for (const i in n.connections.outputs) {
       variable[`${n.id}_${i}`] = `${replaceSpecialChar(n.id)}_${i}_result`
     }
@@ -277,7 +282,7 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
         if (!variableName) throw new Error("Variable Not Found")
         channelId = variableName
       }
-      result += `const ${replaceSpecialChar(node.id)}_result_result = await client.channels.fetch(${channelId});\n`
+      result += `const ${replaceSpecialChar(node.id)}_result_result = await ${variable.client}.channels.fetch(${channelId});\n`
       variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
       break
     }
@@ -289,7 +294,7 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
         if (!variableName) throw new Error("Variable Not Found")
         guildId = variableName
       }
-      result += `const ${replaceSpecialChar(node.id)}_result_result = await client.guilds.fetch(${guildId});\n`
+      result += `const ${replaceSpecialChar(node.id)}_result_result = await ${variable.client}.guilds.fetch(${guildId});\n`
       variable[`${node.id}_result`] = `${replaceSpecialChar(node.id)}_result_result`
       break
     }
@@ -305,4 +310,13 @@ function parseNode(node: FlumeNode, rawNodesList: NodeMap, variable: Record<stri
 }
 function replaceSpecialChar(str: string) {
   return "a_" + str.replace(/-/g, "_").replace(/\s/g, "_")
+}
+
+function randomVariableName() {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < 10; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
 }

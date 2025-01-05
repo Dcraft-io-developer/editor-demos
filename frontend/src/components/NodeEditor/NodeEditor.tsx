@@ -1,13 +1,25 @@
 // src/App.tsx
-import { NodeEditor, NodeMap } from "flume";
+import { NodeEditor as FlumeNodeEditor, NodeMap } from "flume";
 import React, { useRef, useState } from "react";
 import { flumeConfig as config } from "./config";
 
-const App: React.FC = () => {
+interface INodeEditorProps {
+  name: string;
+  description?: string;
+  nodes: NodeMap;
+  setNodes: React.Dispatch<React.SetStateAction<NodeMap>>;
+}
+
+const EventNodeEditor: React.FC<INodeEditorProps> = ({
+  nodes,
+  setNodes,
+  name,
+  description,
+}) => {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const ws = useRef<WebSocket | null>(null);
-  function connect() {
+  const connect = React.useCallback(() => {
     const tmpWs = new WebSocket("ws://localhost:3000/ws");
     tmpWs.onopen = function () {
       console.log("Connected");
@@ -36,13 +48,11 @@ const App: React.FC = () => {
     };
 
     ws.current = tmpWs;
-  }
+  }, [nodes]);
 
   React.useEffect(() => {
     connect();
-  }, []);
-
-  const [nodes, setNodes] = React.useState<NodeMap>({});
+  }, [connect]);
 
   const onNodeChange = React.useCallback((nodes: NodeMap) => {
     // Do whatever you want with the nodes
@@ -59,25 +69,33 @@ const App: React.FC = () => {
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [setNodes]);
 
   return (
-      <div className="grid h-full grid-cols-3 gap-4">
-        <div className="col-span-2">
-          <NodeEditor
-            portTypes={config.portTypes}
-            nodeTypes={config.nodeTypes}
-            nodes={nodes}
-            onChange={onNodeChange}
-          />
-        </div>
-        <div>
-          <h1>Output</h1>
-          <p>{error}</p>
-          <code>{code}</code>
-        </div>
+    <div className="grid h-full grid-cols-3 gap-4">
+      <div className="col-span-2">
+        <FlumeNodeEditor
+          portTypes={config.portTypes}
+          nodeTypes={config.nodeTypes}
+          nodes={nodes}
+          onChange={onNodeChange}
+        />
       </div>
+      <div>
+        {error && (
+          <>
+            <h1 className="text-2xl text-center text-red-500">Error</h1>
+            <p>{error}</p>
+          </>
+        )}
+        <h1 className="text-2xl text-center">Overview</h1>
+        <p>Name: {name}</p>
+        <p>Description: {description || "No description provided"}</p>
+        <h1 className="text-2xl text-center">Output</h1>
+        <code>{code}</code>
+      </div>
+    </div>
   );
 };
 
-export default App;
+export default EventNodeEditor;

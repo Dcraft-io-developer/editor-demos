@@ -6,7 +6,9 @@
     "dev": "bun run --watch src/index.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "@elysiajs/cors": "^1.2.0",
+    "elysia": "latest",
+    "lowdb": "^7.0.1"
   },
   "devDependencies": {
     "bun-types": "latest"

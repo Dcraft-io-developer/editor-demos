@@ -1,0 +1,11 @@
+{
+  "events": {
+    "noq358bgbro": {
+      "id": "noq358bgbro",
+      "name": "on message send",
+      "description": "handle message send data",
+      "nodes": {}
+    }
+  },
+  "functions": {}
+}
